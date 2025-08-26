@@ -5,27 +5,31 @@ using UnityEngine.InputSystem;
 public class FirstPersonController : MonoBehaviour
 {
     [Header("Movement Settings")]
-    public float walkSpeed = 6f;
-    public float runSpeed = 10f;
-    public float acceleration = 50f;
-    public float deceleration = 60f;
-    public float airControl = 0.1f;
-    public float jumpHeight = 10f;
-    public float gravity = -20f;
-    public float jumpCutMultiplier = 2f;
+    public float walkSpeed = 8f;
+    public float runSpeed = 14f;
+    public float acceleration = 80f;
+    public float deceleration = 90f;
+    public float airControl = 0.25f;
+    public float jumpHeight = 12f;
+    public float gravity = -35f;
+    public float jumpCutMultiplier = 2.5f;
 
     [Header("Sliding Settings")]
-    public float slideSpeed = 15f;
-    public float slideDeceleration = 8f;
-    public float slideTransitionSpeed = 12f;
-    public float slideDuration = 2.5f;
-    public float slideMinSpeed = 2f;
+    public float slideInitialSpeed = 10f;
+    public float slideMaxSpeed = 16f;
+    public float slideAcceleration = 20f;
+    public float slideDeceleration = 18f;
+    public float slideTransitionSpeed = 18f;
+    public float slideDuration = 1.0f;
+    public float slideMinSpeed = 3f;
     public float slideControllerHeight = 1f;
     public Vector3 slideCameraOffset = new Vector3(0, -0.8f, 0);
-    public float slideMomentumRetention = 0.7f;
+    public float slideMomentumRetention = 0.3f;
     public float slideJumpHeightMultiplier = 1.2f;
-    public float slideJumpHorizontalBoost = 1.8f;
-    public float slideEndGracePeriod = 0.3f;
+    public float slideJumpHorizontalBoost = 1.4f;
+    public float slideEndGracePeriod = 0.15f;
+    public float slideSteerStrength = 0.4f;
+    public float slideGroundStick = 10f;
 
     [Header("Ground Settings")]
     public float groundStickForce = 2f;
@@ -67,10 +71,12 @@ public class FirstPersonController : MonoBehaviour
     private bool jumpPressed;
     private bool jumpReleased;
     private bool slidePressed;
+    private bool slideHeld;
 
     private bool isSliding;
     private float slideTimer;
     private Vector3 slideDirection;
+    private float currentSlideSpeed;
     private float originalControllerHeight;
     private Vector3 originalControllerCenter;
     private float slideEndTimer;
@@ -83,7 +89,7 @@ public class FirstPersonController : MonoBehaviour
     private Vector3 slideCameraPos;
     private float bobTimer;
     private float stepTimer;
-    private float coyoteTime = 0.1f;
+    private float coyoteTime = 0.15f;
     private float coyoteTimeCounter;
 
     void Awake()
@@ -162,6 +168,7 @@ public class FirstPersonController : MonoBehaviour
         {
             if (slideAction.WasPressedThisFrame())
                 slidePressed = true;
+            slideHeld = slideAction.IsPressed();
         }
     }
 
@@ -181,19 +188,52 @@ public class FirstPersonController : MonoBehaviour
         {
             slideTimer -= Time.deltaTime;
 
-            if (slideTimer <= 0f || currentMovement.magnitude < slideMinSpeed * 0.3f || !isGrounded)
+            Vector2 moveInput = Vector2.zero;
+            if (moveAction != null)
+                moveInput = moveAction.ReadValue<Vector2>();
+            float slideProgress = (slideDuration - slideTimer) / slideDuration;
+
+            float speedCurve;
+            if (slideProgress < 0.2f)
             {
-                StopSlide();
+                speedCurve = Mathf.Lerp(0.9f, 1.1f, slideProgress / 0.2f);
+            }
+            else if (slideProgress < 0.5f)
+            {
+                speedCurve = 1.1f;
             }
             else
             {
-                float slideProgress = (slideDuration - slideTimer) / slideDuration;
-                float momentumFalloff = Mathf.Lerp(1f, slideMomentumRetention, slideProgress);
+                float decelPhase = (slideProgress - 0.5f) / 0.5f;
+                speedCurve = Mathf.Lerp(1.1f, 0.3f, decelPhase);
+            }
 
-                Vector3 targetSlideMovement = slideDirection * slideSpeed * momentumFalloff;
-                currentMovement = Vector3.Lerp(currentMovement, targetSlideMovement, slideDeceleration * Time.deltaTime);
+            currentSlideSpeed = Mathf.Lerp(slideInitialSpeed, slideMaxSpeed, speedCurve);
 
-                slideMomentum = currentMovement;
+            Vector3 steerDirection = (transform.right * moveInput.x).normalized;
+            slideDirection = Vector3.Slerp(slideDirection,
+                (slideDirection + steerDirection * slideSteerStrength).normalized,
+                Time.deltaTime * 3.5f);
+
+            Vector3 targetSlideMovement = slideDirection * currentSlideSpeed;
+            currentMovement = Vector3.Lerp(currentMovement, targetSlideMovement,
+                slideAcceleration * Time.deltaTime);
+
+            slideMomentum = currentMovement * slideMomentumRetention;
+
+            if (isGrounded && velocity.y <= 0)
+            {
+                velocity.y = -slideGroundStick;
+            }
+
+            bool shouldEndSlide = slideTimer <= 0f ||
+                                 currentMovement.magnitude < slideMinSpeed * 0.5f ||
+                                 !isGrounded ||
+                                 (!slideHeld && slideTimer < slideDuration * 0.7f); 
+
+            if (shouldEndSlide)
+            {
+                StopSlide();
             }
 
             if (playerCamera != null)
@@ -217,27 +257,27 @@ public class FirstPersonController : MonoBehaviour
         slideDirection = currentMovement.normalized;
         slideEndTimer = 0f;
 
-        float currentSpeedBoost = Mathf.Clamp(currentMovement.magnitude / runSpeed, 0.8f, 1.5f);
-        slideSpeed *= currentSpeedBoost;
+        float initialSpeedMultiplier = Mathf.Clamp(currentMovement.magnitude / runSpeed, 0.8f, 1.2f);
+        currentSlideSpeed = slideInitialSpeed * initialSpeedMultiplier;
 
         controller.height = slideControllerHeight;
-        controller.center = new Vector3(originalControllerCenter.x, slideControllerHeight * 0.5f, originalControllerCenter.z);
+        controller.center = new Vector3(originalControllerCenter.x,
+            slideControllerHeight * 0.5f, originalControllerCenter.z);
 
-        Debug.Log($"Started sliding with speed boost: {currentSpeedBoost}");
+        Debug.Log($"Started sliding with initial speed: {currentSlideSpeed}");
     }
 
     void StopSlide()
     {
         if (!isSliding) return;
+
         if (CanStandUp())
         {
             isSliding = false;
             slideEndTimer = slideEndGracePeriod;
-
-            slideSpeed = 15f;
-
             controller.height = originalControllerHeight;
             controller.center = originalControllerCenter;
+
             if (playerCamera != null)
             {
                 playerCamera.transform.localPosition = Vector3.Lerp(
@@ -247,7 +287,7 @@ public class FirstPersonController : MonoBehaviour
                 );
             }
 
-            Debug.Log("Stopped sliding - momentum jump available");
+            Debug.Log("Stopped sliding - momentum jump available for " + slideEndGracePeriod + " seconds");
         }
         else
         {
@@ -267,6 +307,7 @@ public class FirstPersonController : MonoBehaviour
     {
         wasGrounded = isGrounded;
         isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+
         if (isGrounded)
         {
             coyoteTimeCounter = coyoteTime;
@@ -275,6 +316,7 @@ public class FirstPersonController : MonoBehaviour
         {
             coyoteTimeCounter -= Time.deltaTime;
         }
+
         if (isGrounded && velocity.y <= 0)
         {
             velocity.y = -groundStickForce;
@@ -317,7 +359,7 @@ public class FirstPersonController : MonoBehaviour
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
         targetMovement *= currentSpeed;
 
-        float airControlMultiplier = (slideEndTimer > 0f && !isGrounded) ? 0.3f : 1f;
+        float airControlMultiplier = (slideEndTimer > 0f && !isGrounded) ? 0.6f : 1f;
         float currentAcceleration = isGrounded ?
             (targetMovement.magnitude > 0 ? acceleration : deceleration) :
             acceleration * airControl * airControlMultiplier;
@@ -329,29 +371,28 @@ public class FirstPersonController : MonoBehaviour
 
     void HandleJump()
     {
-        if (isSliding)
+        if (jumpPressed && isSliding && isGrounded)
         {
-            jumpPressed = false;
-            jumpReleased = false;
-            return;
+            StopSlide();
         }
 
         if (jumpPressed && coyoteTimeCounter > 0f)
         {
             float jumpVelocityY = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            if (slideEndTimer > 0f)
+
+            if (slideEndTimer > 0f && isGrounded)
             {
                 jumpVelocityY *= slideJumpHeightMultiplier;
                 Vector3 horizontalMomentum = new Vector3(slideMomentum.x, 0, slideMomentum.z) * slideJumpHorizontalBoost;
                 currentMovement += horizontalMomentum;
-                slideEndTimer = 0f;
-                slideMomentum = Vector3.zero;
+                slideEndTimer = 0f; 
+                slideMomentum = Vector3.zero; 
 
                 Debug.Log($"Momentum jump! Height: {jumpVelocityY}, Horizontal boost: {horizontalMomentum.magnitude}");
             }
 
             velocity.y = jumpVelocityY;
-            coyoteTimeCounter = 0f;
+            coyoteTimeCounter = 0f; 
         }
 
         if (jumpReleased && velocity.y > 0)
@@ -360,8 +401,10 @@ public class FirstPersonController : MonoBehaviour
         }
 
         velocity.y += gravity * Time.deltaTime;
-        if (velocity.y < gravity * 2f)
-            velocity.y = gravity * 2f;
+
+        float maxFallSpeed = gravity * 1.5f;
+        if (velocity.y < maxFallSpeed)
+            velocity.y = maxFallSpeed;
 
         controller.Move(new Vector3(0, velocity.y * Time.deltaTime, 0));
         jumpPressed = false;
@@ -391,6 +434,7 @@ public class FirstPersonController : MonoBehaviour
                 );
             }
         }
+
         if (enableStepSounds && audioSource != null && footstepSounds != null && footstepSounds.Length > 0 && !isSliding)
         {
             bool isMoving = currentMovement.magnitude > 0.1f && isGrounded;
@@ -425,6 +469,7 @@ public class FirstPersonController : MonoBehaviour
             Gizmos.color = isGrounded ? Color.green : Color.red;
             Gizmos.DrawWireSphere(groundCheck.position, groundDistance);
         }
+
         if (isSliding && Application.isPlaying)
         {
             Gizmos.color = Color.yellow;
@@ -452,6 +497,8 @@ public class FirstPersonController : MonoBehaviour
     {
         Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
     }
+
     public bool IsSliding => isSliding;
     public float SlideTimeRemaining => slideTimer;
+    public float CurrentSlideSpeed => currentSlideSpeed;
 }
