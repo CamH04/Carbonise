@@ -1,0 +1,1 @@
++ Pistol is at scale (0.25, 0.25, 0.25)

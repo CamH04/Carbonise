@@ -11,7 +11,7 @@ public class Player : MonoBehaviour
     public float deceleration = 90f;
     public float airControl = 0.25f;
     public float jumpHeight = 12f;
-    public float gravity = -35f;
+    public float gravity = -200f;
     public float jumpCutMultiplier = 2.5f;
 
     [Header("Sliding Settings")]
@@ -32,7 +32,7 @@ public class Player : MonoBehaviour
     public float slideGroundStick = 10f;
 
     [Header("Ground Settings")]
-    public float groundStickForce = 2f;
+    public float groundStickForce = 0.5f;
     public float slopeLimit = 45f;
 
     [Header("Mouse Look Settings")]
@@ -41,7 +41,7 @@ public class Player : MonoBehaviour
 
     [Header("Ground Check")]
     public Transform groundCheck;
-    public float groundDistance = 0.4f;
+    public float groundDistance = 1f;
     public LayerMask groundMask;
 
     [Header("3D Game Features")]
@@ -63,6 +63,10 @@ public class Player : MonoBehaviour
     private InputAction runAction;
     private InputAction slideAction;
 
+
+    [Header("Jump Tuning")]
+    public float jumpBufferTime = 0.1f;  
+    private float jumpBufferCounter;
     private Vector3 velocity;
     private Vector3 currentMovement;
     private bool isGrounded;
@@ -72,6 +76,8 @@ public class Player : MonoBehaviour
     private bool jumpReleased;
     private bool slidePressed;
     private bool slideHeld;
+    bool canJump;
+
 
     private bool isSliding;
     private float slideTimer;
@@ -126,7 +132,8 @@ public class Player : MonoBehaviour
         {
             GameObject groundCheckObj = new GameObject("GroundCheck");
             groundCheckObj.transform.SetParent(transform);
-            groundCheckObj.transform.localPosition = new Vector3(0, -1f, 0);
+            float bottomOffset = -controller.height * 0.5f - 0.1f;
+            groundCheckObj.transform.localPosition = new Vector3(0, bottomOffset, 0);
             groundCheck = groundCheckObj.transform;
         }
     }
@@ -148,7 +155,10 @@ public class Player : MonoBehaviour
         if (jumpAction != null)
         {
             if (jumpAction.WasPressedThisFrame())
-                jumpPressed = true;
+            {
+                jumpBufferCounter = jumpBufferTime;
+            }
+
             if (jumpAction.WasReleasedThisFrame())
                 jumpReleased = true;
         }
@@ -160,6 +170,7 @@ public class Player : MonoBehaviour
             slideHeld = slideAction.IsPressed();
         }
     }
+
 
     void HandleSliding()
     {
@@ -227,10 +238,12 @@ public class Player : MonoBehaviour
             controller.center = originalControllerCenter;
             controller.Move(Vector3.down * (heightDiff * 0.5f));
         }
+        /*
         else
         {
             Debug.Log("Cannot stand up, staying crouched");
         }
+        */
         if (playerCamera != null)
         {
             Vector3 targetCameraPos = (controller.height >= originalControllerHeight) ? originalCameraPos : slideCameraPos;
@@ -248,16 +261,21 @@ public class Player : MonoBehaviour
     void HandleGroundCheck()
     {
         wasGrounded = isGrounded;
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        float rayDistance = 2.5f; // kill me
+        isGrounded = Physics.Raycast(transform.position, Vector3.down, rayDistance, groundMask);
+
+        //Debug.Log($"Player Y: {transform.position.y:F2}, Ground Hit: {isGrounded}, RayDistance: {rayDistance}");
 
         if (isGrounded)
             coyoteTimeCounter = coyoteTime;
         else
-            coyoteTimeCounter -= Time.deltaTime;
+            coyoteTimeCounter = Mathf.Max(0f, coyoteTimeCounter - Time.deltaTime);
 
         if (isGrounded && velocity.y <= 0)
             velocity.y = -groundStickForce;
     }
+
+
 
     void HandleMouseLook()
     {
@@ -298,7 +316,14 @@ public class Player : MonoBehaviour
 
     void HandleJump()
     {
-        if (jumpPressed && coyoteTimeCounter > 0f)
+        canJump = isGrounded || coyoteTimeCounter > 0f;
+        /*
+        if (jumpBufferCounter > 0f)
+        {
+            Debug.Log($"JUMP ATTEMPT - Grounded: {isGrounded}, Coyote: {coyoteTimeCounter:F2}, CanJump: {canJump}, Buffer: {jumpBufferCounter:F2}");
+        }
+        */
+        if (jumpBufferCounter > 0f && canJump)
         {
             if (isSliding && isGrounded)
                 StopSlide();
@@ -315,21 +340,26 @@ public class Player : MonoBehaviour
             }
 
             velocity.y = jumpVelocityY;
+
             coyoteTimeCounter = 0f;
+            jumpBufferCounter = 0f;
         }
 
         if (jumpReleased && velocity.y > 0)
+        {
             velocity.y *= 1f / jumpCutMultiplier;
+        }
 
         velocity.y += gravity * Time.deltaTime;
-        float maxFallSpeed = gravity * 1.5f;
-        if (velocity.y < maxFallSpeed)
-            velocity.y = maxFallSpeed;
 
         controller.Move(new Vector3(0, velocity.y * Time.deltaTime, 0));
-        jumpPressed = false;
+
         jumpReleased = false;
+
+        if (jumpBufferCounter > 0f)
+            jumpBufferCounter -= Time.deltaTime;
     }
+
 
     void Handle3DFeatures()
     {
