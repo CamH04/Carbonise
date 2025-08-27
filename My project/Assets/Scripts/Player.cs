@@ -140,6 +140,7 @@ public class Player : MonoBehaviour
         HandleMovement();
         HandleJump();
         Handle3DFeatures();
+        HandleStuckRecovery();
     }
 
     void HandleInput()
@@ -206,11 +207,11 @@ public class Player : MonoBehaviour
 
         currentSlideSpeed = Mathf.Clamp(currentMovement.magnitude, slideInitialSpeed, slideMaxSpeed);
         slideMomentum = slideDirection * currentSlideSpeed * slideMomentumRetention;
-
-        float heightDiff = controller.height - slideControllerHeight;
+        float heightDiff = originalControllerHeight - slideControllerHeight;
+        Vector3 newCenter = new Vector3(originalControllerCenter.x, originalControllerCenter.y - (heightDiff * 0.5f), originalControllerCenter.z);
         controller.height = slideControllerHeight;
-        controller.center = new Vector3(originalControllerCenter.x, slideControllerHeight * 0.5f, originalControllerCenter.z);
-        controller.Move(Vector3.up * heightDiff * 0.5f);
+        controller.center = newCenter;
+        controller.Move(Vector3.up * (heightDiff * 0.5f));
     }
 
     void StopSlide()
@@ -219,27 +220,29 @@ public class Player : MonoBehaviour
 
         isSliding = false;
         slideEndTimer = slideEndGracePeriod;
-
         if (CanStandUp())
         {
-            float heightDiff = originalControllerHeight - controller.height;
+            float heightDiff = originalControllerHeight - slideControllerHeight;
             controller.height = originalControllerHeight;
             controller.center = originalControllerCenter;
-            controller.Move(Vector3.up * heightDiff * 0.5f);
+            controller.Move(Vector3.down * (heightDiff * 0.5f));
         }
-
+        else
+        {
+            Debug.Log("Cannot stand up, staying crouched");
+        }
         if (playerCamera != null)
         {
-            Vector3 targetCameraPos = CanStandUp() ? originalCameraPos : slideCameraPos;
+            Vector3 targetCameraPos = (controller.height >= originalControllerHeight) ? originalCameraPos : slideCameraPos;
             playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, targetCameraPos, ref cameraVelocity, cameraSmoothTime);
         }
     }
 
     bool CanStandUp()
     {
-        Vector3 bottom = transform.position + controller.center - Vector3.up * (originalControllerHeight * 0.5f);
-        Vector3 top = transform.position + controller.center + Vector3.up * (originalControllerHeight * 0.5f);
-        return !Physics.CheckCapsule(bottom, top, controller.radius * 0.9f, groundMask);
+        Vector3 currentBottom = transform.position + controller.center - Vector3.up * (controller.height * 0.5f);
+        Vector3 futureTop = currentBottom + Vector3.up * originalControllerHeight;
+        return !Physics.CheckCapsule(currentBottom, futureTop, controller.radius * 0.95f, groundMask);
     }
 
     void HandleGroundCheck()
@@ -360,6 +363,24 @@ public class Player : MonoBehaviour
                     audioSource.PlayOneShot(clip, volume);
                     float speedMultiplier = isRunning ? 0.7f : 1f;
                     stepTimer = stepInterval * speedMultiplier;
+                }
+            }
+        }
+    }
+    void HandleStuckRecovery()
+    {
+        if (!isSliding && controller.height < originalControllerHeight && isGrounded)
+        {
+            if (CanStandUp())
+            {
+                float heightDiff = originalControllerHeight - controller.height;
+                controller.height = originalControllerHeight;
+                controller.center = originalControllerCenter;
+                controller.Move(Vector3.down * (heightDiff * 0.5f));
+
+                if (playerCamera != null)
+                {
+                    playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, originalCameraPos, ref cameraVelocity, cameraSmoothTime);
                 }
             }
         }
