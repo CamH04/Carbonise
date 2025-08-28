@@ -2,8 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
-public class Player : MonoBehaviour
-{
+public class Player : MonoBehaviour {
     [Header("Movement Settings")]
     public float walkSpeed = 8f;
     public float runSpeed = 14f;
@@ -63,9 +62,8 @@ public class Player : MonoBehaviour
     private InputAction runAction;
     private InputAction slideAction;
 
-
     [Header("Jump Tuning")]
-    public float jumpBufferTime = 0.1f;  
+    public float jumpBufferTime = 0.1f;
     private float jumpBufferCounter;
     private Vector3 velocity;
     private Vector3 currentMovement;
@@ -77,7 +75,6 @@ public class Player : MonoBehaviour
     private bool slidePressed;
     private bool slideHeld;
     bool canJump;
-
 
     private bool isSliding;
     private float slideTimer;
@@ -100,8 +97,7 @@ public class Player : MonoBehaviour
     private Vector3 cameraVelocity;
     private float cameraSmoothTime = 0.08f;
 
-    void Awake()
-    {
+    void Awake() {
         controller = GetComponent<CharacterController>();
         playerCamera = GetComponentInChildren<Camera>();
         if (playerCamera == null) playerCamera = Camera.main;
@@ -109,8 +105,7 @@ public class Player : MonoBehaviour
         originalControllerHeight = controller.height;
         originalControllerCenter = controller.center;
 
-        if (playerInput != null && playerInput.actions != null)
-        {
+        if (playerInput != null && playerInput.actions != null) {
             moveAction = playerInput.actions["Move"];
             lookAction = playerInput.actions["Look"];
             jumpAction = playerInput.actions["Jump"];
@@ -119,8 +114,7 @@ public class Player : MonoBehaviour
         }
     }
 
-    void Start()
-    {
+    void Start() {
         Cursor.lockState = CursorLockMode.Locked;
         originalCameraPos = playerCamera.transform.localPosition;
         slideCameraPos = originalCameraPos + slideCameraOffset;
@@ -128,8 +122,7 @@ public class Player : MonoBehaviour
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null && enableStepSounds) audioSource = gameObject.AddComponent<AudioSource>();
 
-        if (groundCheck == null)
-        {
+        if (groundCheck == null) {
             GameObject groundCheckObj = new GameObject("GroundCheck");
             groundCheckObj.transform.SetParent(transform);
             float bottomOffset = -controller.height * 0.5f - 0.1f;
@@ -138,8 +131,7 @@ public class Player : MonoBehaviour
         }
     }
 
-    void Update()
-    {
+    void Update() {
         HandleInput();
         HandleGroundCheck();
         HandleMouseLook();
@@ -150,12 +142,9 @@ public class Player : MonoBehaviour
         HandleStuckRecovery();
     }
 
-    void HandleInput()
-    {
-        if (jumpAction != null)
-        {
-            if (jumpAction.WasPressedThisFrame())
-            {
+    void HandleInput() {
+        if (jumpAction != null) {
+            if (jumpAction.WasPressedThisFrame()) {
                 jumpBufferCounter = jumpBufferTime;
             }
 
@@ -163,25 +152,21 @@ public class Player : MonoBehaviour
                 jumpReleased = true;
         }
 
-        if (slideAction != null)
-        {
+        if (slideAction != null) {
             if (slideAction.WasPressedThisFrame())
                 slidePressed = true;
             slideHeld = slideAction.IsPressed();
         }
     }
 
-
-    void HandleSliding()
-    {
+    void HandleSliding() {
         if (slideEndTimer > 0f)
             slideEndTimer -= Time.deltaTime;
 
         if (slidePressed && isGrounded && !isSliding && slideEndTimer <= 0f && currentMovement.magnitude > slideMinSpeed)
             StartSlide();
 
-        if (isSliding)
-        {
+        if (isSliding) {
             slideTimer -= Time.deltaTime;
             currentSlideSpeed = Mathf.MoveTowards(currentSlideSpeed, 0f, slideDeceleration * Time.deltaTime);
 
@@ -209,8 +194,7 @@ public class Player : MonoBehaviour
         slidePressed = false;
     }
 
-    void StartSlide()
-    {
+    void StartSlide() {
         isSliding = true;
         slideTimer = slideDuration;
         slideDirection = currentMovement.normalized;
@@ -225,14 +209,12 @@ public class Player : MonoBehaviour
         controller.Move(Vector3.up * (heightDiff * 0.5f));
     }
 
-    void StopSlide()
-    {
+    void StopSlide() {
         if (!isSliding) return;
 
         isSliding = false;
         slideEndTimer = slideEndGracePeriod;
-        if (CanStandUp())
-        {
+        if (CanStandUp()) {
             float heightDiff = originalControllerHeight - slideControllerHeight;
             controller.height = originalControllerHeight;
             controller.center = originalControllerCenter;
@@ -244,22 +226,19 @@ public class Player : MonoBehaviour
             Debug.Log("Cannot stand up, staying crouched");
         }
         */
-        if (playerCamera != null)
-        {
+        if (playerCamera != null) {
             Vector3 targetCameraPos = (controller.height >= originalControllerHeight) ? originalCameraPos : slideCameraPos;
             playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, targetCameraPos, ref cameraVelocity, cameraSmoothTime);
         }
     }
 
-    bool CanStandUp()
-    {
+    bool CanStandUp() {
         Vector3 currentBottom = transform.position + controller.center - Vector3.up * (controller.height * 0.5f);
         Vector3 futureTop = currentBottom + Vector3.up * originalControllerHeight;
         return !Physics.CheckCapsule(currentBottom, futureTop, controller.radius * 0.95f, groundMask);
     }
 
-    void HandleGroundCheck()
-    {
+    void HandleGroundCheck() {
         wasGrounded = isGrounded;
         float rayDistance = 2.5f; // kill me
         isGrounded = Physics.Raycast(transform.position, Vector3.down, rayDistance, groundMask);
@@ -275,12 +254,8 @@ public class Player : MonoBehaviour
             velocity.y = -groundStickForce;
     }
 
-
-
-    void HandleMouseLook()
-    {
-        if (lookAction != null)
-        {
+    void HandleMouseLook() {
+        if (lookAction != null) {
             mouseDelta = lookAction.ReadValue<Vector2>();
             float mouseX = mouseDelta.x * mouseSensitivity * Time.deltaTime;
             float mouseY = mouseDelta.y * mouseSensitivity * Time.deltaTime;
@@ -292,10 +267,8 @@ public class Player : MonoBehaviour
         }
     }
 
-    void HandleMovement()
-    {
-        if (isSliding)
-        {
+    void HandleMovement() {
+        if (isSliding) {
             controller.Move(currentMovement * Time.deltaTime);
             return;
         }
@@ -314,8 +287,7 @@ public class Player : MonoBehaviour
         controller.Move(currentMovement * Time.deltaTime);
     }
 
-    void HandleJump()
-    {
+    void HandleJump() {
         canJump = isGrounded || coyoteTimeCounter > 0f;
         /*
         if (jumpBufferCounter > 0f)
@@ -323,15 +295,13 @@ public class Player : MonoBehaviour
             Debug.Log($"JUMP ATTEMPT - Grounded: {isGrounded}, Coyote: {coyoteTimeCounter:F2}, CanJump: {canJump}, Buffer: {jumpBufferCounter:F2}");
         }
         */
-        if (jumpBufferCounter > 0f && canJump)
-        {
+        if (jumpBufferCounter > 0f && canJump) {
             if (isSliding && isGrounded)
                 StopSlide();
 
             float jumpVelocityY = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
-            if (slideEndTimer > 0f && isGrounded)
-            {
+            if (slideEndTimer > 0f && isGrounded) {
                 jumpVelocityY *= slideJumpHeightMultiplier;
                 Vector3 horizontalMomentum = new Vector3(slideMomentum.x, 0, slideMomentum.z) * slideJumpHorizontalBoost;
                 currentMovement += horizontalMomentum;
@@ -345,8 +315,7 @@ public class Player : MonoBehaviour
             jumpBufferCounter = 0f;
         }
 
-        if (jumpReleased && velocity.y > 0)
-        {
+        if (jumpReleased && velocity.y > 0) {
             velocity.y *= 1f / jumpCutMultiplier;
         }
 
@@ -360,34 +329,26 @@ public class Player : MonoBehaviour
             jumpBufferCounter -= Time.deltaTime;
     }
 
-
-    void Handle3DFeatures()
-    {
-        if (enableHeadBob && playerCamera != null && !isSliding)
-        {
+    void Handle3DFeatures() {
+        if (enableHeadBob && playerCamera != null && !isSliding) {
             bool isMoving = currentMovement.magnitude > 0.1f && isGrounded;
-            if (isMoving)
-            {
+            if (isMoving) {
                 float speedMultiplier = isRunning ? 1.3f : 1f;
                 bobTimer += Time.deltaTime * bobFrequency * speedMultiplier;
                 float bobOffset = Mathf.Sin(bobTimer) * bobAmplitude * (currentMovement.magnitude / walkSpeed);
                 playerCamera.transform.localPosition = originalCameraPos + Vector3.up * bobOffset;
             }
-            else
-            {
+            else {
                 bobTimer = 0f;
                 playerCamera.transform.localPosition = Vector3.Lerp(playerCamera.transform.localPosition, originalCameraPos, Time.deltaTime * 6f);
             }
         }
 
-        if (enableStepSounds && audioSource != null && footstepSounds != null && footstepSounds.Length > 0 && !isSliding)
-        {
+        if (enableStepSounds && audioSource != null && footstepSounds != null && footstepSounds.Length > 0 && !isSliding) {
             bool isMoving = currentMovement.magnitude > 0.1f && isGrounded;
-            if (isMoving)
-            {
+            if (isMoving) {
                 stepTimer -= Time.deltaTime;
-                if (stepTimer <= 0f)
-                {
+                if (stepTimer <= 0f) {
                     AudioClip clip = footstepSounds[Random.Range(0, footstepSounds.Length)];
                     float volume = isRunning ? 0.8f : 0.6f;
                     audioSource.PlayOneShot(clip, volume);
@@ -397,19 +358,16 @@ public class Player : MonoBehaviour
             }
         }
     }
-    void HandleStuckRecovery()
-    {
-        if (!isSliding && controller.height < originalControllerHeight && isGrounded)
-        {
-            if (CanStandUp())
-            {
+
+    void HandleStuckRecovery() {
+        if (!isSliding && controller.height < originalControllerHeight && isGrounded) {
+            if (CanStandUp()) {
                 float heightDiff = originalControllerHeight - controller.height;
                 controller.height = originalControllerHeight;
                 controller.center = originalControllerCenter;
                 controller.Move(Vector3.down * (heightDiff * 0.5f));
 
-                if (playerCamera != null)
-                {
+                if (playerCamera != null) {
                     playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, originalCameraPos, ref cameraVelocity, cameraSmoothTime);
                 }
             }
