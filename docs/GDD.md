@@ -27,6 +27,7 @@
 * Manhunt (dark, grimy tone)
 * Hotline Miami (stylish rhythm of violence, flow, and audiovisual punch)
 * I Am Your Beast (combat feel, speed, aggression)
+* Superhot (cambot , without speed)
 
 ## Gameplay
 
