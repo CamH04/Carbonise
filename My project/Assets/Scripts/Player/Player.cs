@@ -14,10 +14,10 @@ public class Player : MonoBehaviour {
     public float jumpCutMultiplier = 2.5f;
 
     [Header("Sliding Settings")]
-    public float slideInitialSpeed = 10f;
-    public float slideMaxSpeed = 16f;
-    public float slideAcceleration = 20f;
-    public float slideDeceleration = 8f;
+    public float slideInitialSpeed = 15f;
+    public float slideMaxSpeed = 24f;
+    public float slideAcceleration = 30f;
+    public float slideDeceleration = 6f;
     public float slideTransitionSpeed = 18f;
     public float slideDuration = 1.0f;
     public float slideMinSpeed = 3f;
@@ -51,6 +51,9 @@ public class Player : MonoBehaviour {
     public AudioClip[] footstepSounds;
     public float stepInterval = 0.5f;
 
+    [Header("Debug")]
+    public bool debugSlideInput = false;
+
     private CharacterController controller;
     private Camera playerCamera;
     private AudioSource audioSource;
@@ -72,8 +75,12 @@ public class Player : MonoBehaviour {
     private bool isRunning;
     private bool jumpPressed;
     private bool jumpReleased;
+
     private bool slidePressed;
     private bool slideHeld;
+    private bool slidePressedThisFrame;
+    private bool slideWasPressed;
+
     bool canJump;
 
     private bool isSliding;
@@ -111,6 +118,10 @@ public class Player : MonoBehaviour {
             jumpAction = playerInput.actions["Jump"];
             runAction = playerInput.actions["Run"];
             slideAction = playerInput.actions["Slide"];
+            if (slideAction != null) {
+                slideAction.performed += OnSlidePerformed;
+                slideAction.canceled += OnSlideCanceled;
+            }
         }
     }
 
@@ -131,6 +142,27 @@ public class Player : MonoBehaviour {
         }
     }
 
+
+    void OnDestroy() { // no mem leaks pls
+        if (slideAction != null) {
+            slideAction.performed -= OnSlidePerformed;
+            slideAction.canceled -= OnSlideCanceled;
+        }
+    }
+
+    private void OnSlidePerformed(InputAction.CallbackContext context) {
+        slidePressedThisFrame = true;
+        slideWasPressed = true;
+
+        if (debugSlideInput)
+            Debug.Log($"Slide performed! Context phase: {context.phase}, Time: {Time.time}");
+    }
+
+    private void OnSlideCanceled(InputAction.CallbackContext context) {
+        if (debugSlideInput)
+            Debug.Log($"Slide canceled! Context phase: {context.phase}, Time: {Time.time}");
+    }
+
     void Update() {
         HandleInput();
         HandleGroundCheck();
@@ -140,6 +172,7 @@ public class Player : MonoBehaviour {
         HandleJump();
         Handle3DFeatures();
         HandleStuckRecovery();
+        slidePressedThisFrame = false; //fixing slide bug
     }
 
     void HandleInput() {
@@ -151,19 +184,33 @@ public class Player : MonoBehaviour {
             if (jumpAction.WasReleasedThisFrame())
                 jumpReleased = true;
         }
-
         if (slideAction != null) {
-            if (slideAction.WasPressedThisFrame())
+            slidePressed = slidePressedThisFrame;
+            if (!slidePressed && slideAction.WasPressedThisFrame()) {
                 slidePressed = true;
+                if (debugSlideInput)
+                    Debug.Log("Slide detected via WasPressedThisFrame fallback");
+            }
             slideHeld = slideAction.IsPressed();
+
+            if (debugSlideInput && slidePressed) {
+                Debug.Log($"Slide input detected! Method: Event={slidePressedThisFrame}, WasPressed={slideAction.WasPressedThisFrame()}, CurrentlyHeld={slideHeld}");
+            }
         }
     }
 
     void HandleSliding() {
         if (slideEndTimer > 0f)
             slideEndTimer -= Time.deltaTime;
+        bool canStartSlide = slidePressed && isGrounded && !isSliding && slideEndTimer <= 0f && currentMovement.magnitude > slideMinSpeed;
 
-        if (slidePressed && isGrounded && !isSliding && slideEndTimer <= 0f && currentMovement.magnitude > slideMinSpeed)
+        if (debugSlideInput) {
+            if (slidePressed) {
+                Debug.Log($"Slide attempt - CanStart: {canStartSlide}, Grounded: {isGrounded}, NotSliding: {!isSliding}, EndTimer: {slideEndTimer:F2}, Speed: {currentMovement.magnitude:F2} (min: {slideMinSpeed})");
+            }
+        }
+
+        if (canStartSlide)
             StartSlide();
 
         if (isSliding) {
@@ -181,20 +228,21 @@ public class Player : MonoBehaviour {
             bool shouldEndSlide =
                 slideTimer <= 0f ||
                 !isGrounded ||
-                (currentSlideSpeed < slideMinSpeed && slideTimer < slideDuration * 0.6f) ||
-                (!slideHeld && slideTimer < slideDuration * 0.7f);
-
-            if (shouldEndSlide)
-                StopSlide();
+                (currentSlideSpeed < slideMinSpeed && slideTimer < slideDuration * 0.6f);
+            if (debugSlideInput && shouldEndSlide) {
+                Debug.Log($"Ending slide - Timer: {slideTimer <= 0f}, NotGrounded: {!isGrounded}, TooSlow: {currentSlideSpeed < slideMinSpeed && slideTimer < slideDuration * 0.6f}");
+            }
 
             if (playerCamera != null)
                 playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, slideCameraPos, ref cameraVelocity, cameraSmoothTime);
         }
-
         slidePressed = false;
     }
 
     void StartSlide() {
+        if (debugSlideInput)
+            Debug.Log("Starting slide!");
+
         isSliding = true;
         slideTimer = slideDuration;
         slideDirection = currentMovement.normalized;
@@ -212,6 +260,9 @@ public class Player : MonoBehaviour {
     void StopSlide() {
         if (!isSliding) return;
 
+        if (debugSlideInput)
+            Debug.Log("Stopping slide!");
+
         isSliding = false;
         slideEndTimer = slideEndGracePeriod;
         if (CanStandUp()) {
@@ -220,12 +271,7 @@ public class Player : MonoBehaviour {
             controller.center = originalControllerCenter;
             controller.Move(Vector3.down * (heightDiff * 0.5f));
         }
-        /*
-        else
-        {
-            Debug.Log("Cannot stand up, staying crouched");
-        }
-        */
+
         if (playerCamera != null) {
             Vector3 targetCameraPos = (controller.height >= originalControllerHeight) ? originalCameraPos : slideCameraPos;
             playerCamera.transform.localPosition = Vector3.SmoothDamp(playerCamera.transform.localPosition, targetCameraPos, ref cameraVelocity, cameraSmoothTime);
@@ -240,10 +286,8 @@ public class Player : MonoBehaviour {
 
     void HandleGroundCheck() {
         wasGrounded = isGrounded;
-        float rayDistance = 2.5f; // kill me
+        float rayDistance = 2.5f;
         isGrounded = Physics.Raycast(transform.position, Vector3.down, rayDistance, groundMask);
-
-        //Debug.Log($"Player Y: {transform.position.y:F2}, Ground Hit: {isGrounded}, RayDistance: {rayDistance}");
 
         if (isGrounded)
             coyoteTimeCounter = coyoteTime;
@@ -289,12 +333,7 @@ public class Player : MonoBehaviour {
 
     void HandleJump() {
         canJump = isGrounded || coyoteTimeCounter > 0f;
-        /*
-        if (jumpBufferCounter > 0f)
-        {
-            Debug.Log($"JUMP ATTEMPT - Grounded: {isGrounded}, Coyote: {coyoteTimeCounter:F2}, CanJump: {canJump}, Buffer: {jumpBufferCounter:F2}");
-        }
-        */
+
         if (jumpBufferCounter > 0f && canJump) {
             if (isSliding && isGrounded)
                 StopSlide();
