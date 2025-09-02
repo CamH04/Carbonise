@@ -361,7 +361,7 @@ GameObject:
   - component: {fileID: 474485856}
   - component: {fileID: 474485855}
   - component: {fileID: 474485854}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -753,6 +753,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1439762793}
+  - component: {fileID: 1439762794}
   m_Layer: 6
   m_Name: Gun
   m_TagString: Untagged
@@ -776,6 +777,51 @@ Transform:
   - {fileID: 1326116770}
   m_Father: {fileID: 1683774174}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1439762794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1439762792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e385567035aa05a4a9876b342f278ded, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damage: 25
+  fireRate: 0.1
+  range: 100
+  hitLayers:
+    serializedVersion: 2
+    m_Bits: 128
+  muzzleFlash: {fileID: 0}
+  muzzleFlashDuration: 0.05
+  muzzleParticles: {fileID: 0}
+  hitEffect: {fileID: 0}
+  bulletImpactMarker: {fileID: 0}
+  markerLifetime: 3
+  showTrailLine: 1
+  trailLine: {fileID: 0}
+  trailDuration: 0.2
+  showImpactSphere: 1
+  impactSphereSize: 0.2
+  impactSphereMaterial: {fileID: 0}
+  showUIIndicator: 1
+  impactUIIndicator: {fileID: 0}
+  worldCanvas: {fileID: 0}
+  uiIndicatorLifetime: 1
+  shootSound: {fileID: 0}
+  hitSound: {fileID: 0}
+  shootVolume: 0.7
+  hitVolume: 0.5
+  crosshair: {fileID: 0}
+  normalCrosshairColor: {r: 1, g: 1, b: 1, a: 1}
+  hitCrosshairColor: {r: 1, g: 0, b: 0, a: 1}
+  crosshairHitDuration: 0.1
+  enableRecoil: 1
+  recoilAmount: 2
+  recoilRecovery: 5
 --- !u!1 &1463412529
 GameObject:
   m_ObjectHideFlags: 0
