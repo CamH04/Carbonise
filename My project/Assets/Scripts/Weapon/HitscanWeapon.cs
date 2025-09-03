@@ -44,7 +44,7 @@ public class HitscanWeapon : MonoBehaviour {
     public Color hitCrosshairColor = Color.red;
     public float crosshairHitDuration = 0.1f;
 
-    [Header("Recoil (Optional)")]
+    [Header("Recoil")]
     public bool enableRecoil = true;
     public float recoilAmount = 2f;
     public float recoilRecovery = 5f;
