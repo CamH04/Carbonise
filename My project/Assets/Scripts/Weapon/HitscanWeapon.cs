@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 
 public class HitscanWeapon : MonoBehaviour {
     [Header("Weapon Settings")]
-    public float damage = 100f;
+    public float damage = 50f; //2 shots body to kill
     public float fireRate = 0.1f;
     public float range = 100f;
     public LayerMask hitLayers = -1;
