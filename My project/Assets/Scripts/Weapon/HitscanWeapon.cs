@@ -15,18 +15,18 @@ public class HitscanWeapon : MonoBehaviour {
     public GameObject hitEffect;
 
     [Header("Bullet Impact Visualization")]
-    public GameObject bulletImpactMarker; 
+    public GameObject bulletImpactMarker;
     public float markerLifetime = 3f;
-    public bool showTrailLine = true; 
+    public bool showTrailLine = true;
     public LineRenderer trailLine;
     public float trailDuration = 0.2f;
-    public bool showImpactSphere = true; 
+    public bool showImpactSphere = true;
     public float impactSphereSize = 0.2f;
-    public Material impactSphereMaterial; 
+    public Material impactSphereMaterial;
 
     [Header("UI Impact Indicator")]
     public bool showUIIndicator = true;
-    public GameObject impactUIIndicator; 
+    public GameObject impactUIIndicator;
     public Canvas worldCanvas;
     public float uiIndicatorLifetime = 1f;
 
@@ -58,7 +58,6 @@ public class HitscanWeapon : MonoBehaviour {
     private UnityEngine.UI.Image crosshairImage;
     private float crosshairTimer;
     private Vector2 recoilOffset;
-    private float currentRecoil;
 
     void Awake() {
         playerCamera = GetComponentInParent<Camera>();
@@ -137,14 +136,13 @@ public class HitscanWeapon : MonoBehaviour {
             audioSource.PlayOneShot(shootSound, shootVolume);
         }
         if (enableRecoil) {
-            currentRecoil += recoilAmount;
+            ApplyRecoilImpulse();
         }
         Ray ray = playerCamera.ScreenPointToRay(new Vector3(Screen.width / 2f, Screen.height / 2f, 0f));
         RaycastHit hit;
 
         Vector3 impactPoint;
         bool hitSomething = Physics.Raycast(ray, out hit, range, hitLayers);
-
         if (hitSomething) {
             impactPoint = hit.point;
             ShowBulletImpact(impactPoint, hit.normal, true);
@@ -180,6 +178,17 @@ public class HitscanWeapon : MonoBehaviour {
         }
     }
 
+    void ApplyRecoilImpulse() {
+        float recoilX = Random.Range(-recoilAmount * 0.5f, recoilAmount * 0.5f);
+        float recoilY = recoilAmount;
+
+        recoilOffset.x += recoilX;
+        recoilOffset.y += recoilY;
+
+        recoilOffset.x = Mathf.Clamp(recoilOffset.x, -recoilAmount * 3f, recoilAmount * 3f);
+        recoilOffset.y = Mathf.Clamp(recoilOffset.y, 0f, recoilAmount * 5f);
+    }
+
     void ShowMuzzleFlash(Vector3 targetPoint) {
         if (muzzleFlash == null) return;
 
@@ -211,7 +220,7 @@ public class HitscanWeapon : MonoBehaviour {
                     renderer.material = impactSphereMaterial;
                 }
 
-                Color impactColor = Color.blue; 
+                Color impactColor = Color.blue;
                 if (hitSomething) {
                     Ray checkRay = new Ray(playerCamera.transform.position, (impactPoint - playerCamera.transform.position).normalized);
                     RaycastHit checkHit;
@@ -239,10 +248,10 @@ public class HitscanWeapon : MonoBehaviour {
             GameObject uiIndicator = Instantiate(impactUIIndicator, worldCanvas.transform);
             uiIndicator.transform.position = impactPoint;
             uiIndicator.transform.LookAt(playerCamera.transform);
-            uiIndicator.transform.Rotate(0, 180, 0); 
+            uiIndicator.transform.Rotate(0, 180, 0);
 
             float distance = Vector3.Distance(playerCamera.transform.position, impactPoint);
-            float scale = distance * 0.01f; 
+            float scale = distance * 0.01f;
             uiIndicator.transform.localScale = Vector3.one * scale;
 
             Destroy(uiIndicator, uiIndicatorLifetime);
@@ -291,34 +300,22 @@ public class HitscanWeapon : MonoBehaviour {
 
     void HandleRecoil() {
         if (!enableRecoil || playerCamera == null) return;
-
-        if (currentRecoil > 0f) {
-            float recoilX = Random.Range(-currentRecoil, currentRecoil) * 0.5f;
-            float recoilY = -currentRecoil;
-
-            recoilOffset.x += recoilX * Time.deltaTime;
-            recoilOffset.y += recoilY * Time.deltaTime;
-
-            currentRecoil = Mathf.Max(0f, currentRecoil - recoilRecovery * Time.deltaTime);
-        }
-
-        if (recoilOffset.magnitude > 0.1f) {
-            recoilOffset = Vector2.Lerp(recoilOffset, Vector2.zero, Time.deltaTime * recoilRecovery);
-        }
-        else {
-            recoilOffset = Vector2.zero;
-        }
-
         if (recoilOffset.magnitude > 0.01f) {
+            recoilOffset = Vector2.Lerp(recoilOffset, Vector2.zero, Time.deltaTime * recoilRecovery);
             Transform cameraTransform = playerCamera.transform;
             Vector3 currentRotation = cameraTransform.localEulerAngles;
+
+            float currentX = currentRotation.x > 180 ? currentRotation.x - 360 : currentRotation.x;
+            float currentY = currentRotation.y > 180 ? currentRotation.y - 360 : currentRotation.y;
+
             cameraTransform.localEulerAngles = new Vector3(
-                currentRotation.x + recoilOffset.y,
-                currentRotation.y + recoilOffset.x,
+                currentX - recoilOffset.y * Time.deltaTime * 60f,
+                currentY + recoilOffset.x * Time.deltaTime * 30f, 
                 currentRotation.z
             );
         }
     }
+
     public void SetPlayerCamera(Camera camera) {
         playerCamera = camera;
     }

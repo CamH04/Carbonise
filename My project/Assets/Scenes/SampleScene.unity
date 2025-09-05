@@ -272,7 +272,7 @@ GameObject:
   - component: {fileID: 140016020}
   m_Layer: 15
   m_Name: Cube (4)
-  m_TagString: Untagged
+  m_TagString: Obsticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1693,7 +1693,7 @@ GameObject:
   - component: {fileID: 1463412531}
   m_Layer: 15
   m_Name: Cube (1)
-  m_TagString: Untagged
+  m_TagString: Obsticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -6752,7 +6752,7 @@ GameObject:
   - component: {fileID: 1686283603}
   m_Layer: 15
   m_Name: Cube
-  m_TagString: Untagged
+  m_TagString: Obsticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -7074,7 +7074,7 @@ GameObject:
   - component: {fileID: 2081680276}
   m_Layer: 15
   m_Name: Cube (3)
-  m_TagString: Untagged
+  m_TagString: Obsticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -7182,7 +7182,7 @@ GameObject:
   - component: {fileID: 2090522014}
   m_Layer: 15
   m_Name: Cube (2)
-  m_TagString: Untagged
+  m_TagString: Obsticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
