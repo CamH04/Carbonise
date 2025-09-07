@@ -149,3 +149,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bf65ca256e83d142a2578c4d1094f30, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  damage: 20
+  speed: 5000
+  lifetime: 5
+  impactEffect: {fileID: 0}
+  whatHitsMe:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  hasTrail: 1
+  trailTime: 0.5
+  trailStartColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  trailEndColor: {r: 1, g: 0, b: 0, a: 1}
+  trailStartWidth: 0.05
+  trailEndWidth: 0.01
+  glowEffect: 1
+  bulletColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  shooter: {fileID: 0}

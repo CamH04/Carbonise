@@ -5570,7 +5570,10 @@ MonoBehaviour:
   patrolSpeed: 2
   chaseSpeed: 9.9
   patrolRadius: 5.89
-  stopDistance: 5
+  optimalRange: 6
+  minRange: 4
+  maxRange: 8
+  repositionSpeed: 2
   visionRange: 22.86
   visionAngle: 65.5
   player: {fileID: 1683774174}
@@ -5585,6 +5588,8 @@ MonoBehaviour:
     m_Bits: 0
   shootSound: {fileID: 0}
   muzzleFlash: {fileID: 0}
+  predictPlayerMovement: 1
+  predictionTime: 0.3
 --- !u!136 &474485855
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -6747,14 +6752,17 @@ MonoBehaviour:
   patrolSpeed: 2
   chaseSpeed: 9.9
   patrolRadius: 5.89
-  stopDistance: 5
+  optimalRange: 6
+  minRange: 4
+  maxRange: 8
+  repositionSpeed: 2
   visionRange: 22.86
   visionAngle: 65.5
   player: {fileID: 1683774174}
   shootRange: 8
   shootDamage: 20
   fireRate: 1
-  projectileSpeed: 15
+  projectileSpeed: 100
   bulletPrefab: {fileID: 7327669311991194101, guid: d15a8c0de6584834bbafc9ed179686e2, type: 3}
   firePoint: {fileID: 268586970}
   obstacleMask:
@@ -6762,6 +6770,8 @@ MonoBehaviour:
     m_Bits: 32768
   shootSound: {fileID: 0}
   muzzleFlash: {fileID: 268586971}
+  predictPlayerMovement: 1
+  predictionTime: 0.3
 --- !u!1 &1550984479
 GameObject:
   m_ObjectHideFlags: 0

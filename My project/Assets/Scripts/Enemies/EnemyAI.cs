@@ -10,10 +10,13 @@ public class EnemyAI : MonoBehaviour {
     public float patrolSpeed = 2f;
     public float chaseSpeed = 4f;
     public float patrolRadius = 3f;
-    public float stopDistance = 5f;
+    public float optimalRange = 6f;          
+    public float minRange = 4f;              
+    public float maxRange = 8f;              
+    public float repositionSpeed = 2f;       
 
     [Header("Vision")]
-    public float visionRange = 6f;
+    public float visionRange = 10f;          
     public float visionAngle = 45f;
     public Transform player;
 
@@ -21,14 +24,23 @@ public class EnemyAI : MonoBehaviour {
     public float shootRange = 8f;
     public float shootDamage = 20f;
     public float fireRate = 1f;
-    public float projectileSpeed = 15f;
-    public GameObject bulletPrefab; 
+    public float projectileSpeed = 100f;     
+    public GameObject bulletPrefab;
     public Transform firePoint;
     public LayerMask obstacleMask;
     public AudioClip shootSound;
     public ParticleSystem muzzleFlash;
+
+    [Header("Prediction Settings")]           
+    public bool predictPlayerMovement = true;
+    public float predictionTime = 0.3f;
+
     private float nextFireTime = 0f;
     private bool isShooting = false;
+    private Vector3 playerLastPosition;        
+    private Vector3 playerVelocity;            
+    private float playerSpeedCheckInterval = 0.1f;
+    private float nextSpeedCheck = 0f;
 
     [Header("Components")]
     private Rigidbody rb;
@@ -39,7 +51,13 @@ public class EnemyAI : MonoBehaviour {
     private bool wasPlayerInVision = false;
     private float deathAnimLeng = 2f;
 
-    
+    private enum CombatState {
+        Patrol,
+        Chase,
+        Combat,
+        Reposition
+    }
+    private CombatState currentState = CombatState.Patrol;
 
     void Start() {
         currentHP = maxHP;
@@ -65,10 +83,16 @@ public class EnemyAI : MonoBehaviour {
             firePointObj.transform.localPosition = new Vector3(0, 1.5f, 1f);
             firePoint = firePointObj.transform;
         }
+
+        if (player != null) {
+            playerLastPosition = player.position;
+        }
     }
 
     void Update() {
         if (isDead) return;
+
+        UpdatePlayerVelocity();
 
         bool playerCurrentlyInVision = PlayerInVision();
         float distanceToPlayer = player != null ? Vector3.Distance(transform.position, player.position) : float.MaxValue;
@@ -80,51 +104,135 @@ public class EnemyAI : MonoBehaviour {
             OnPlayerLost();
         }
 
-        if (playerCurrentlyInVision) {
-            if (distanceToPlayer <= stopDistance && CanShootPlayer()) {
-                StopAndShoot();
-            }
-            else {
-                ChasePlayer();
-            }
+        if (playerCurrentlyInVision && distanceToPlayer <= maxRange) {
+            HandleCombatBehavior(distanceToPlayer);
+        }
+        else if (playerCurrentlyInVision) {
+            ChasePlayer();
+            currentState = CombatState.Chase;
         }
         else {
             PatrolCircle();
+            currentState = CombatState.Patrol;
         }
 
         wasPlayerInVision = playerCurrentlyInVision;
     }
 
-    void OnPlayerSpotted() {
-        Debug.Log("Player spotted!");
+    void UpdatePlayerVelocity() {
+        if (player == null || Time.time < nextSpeedCheck) return;
+
+        Vector3 currentPlayerPos = player.position;
+        playerVelocity = (currentPlayerPos - playerLastPosition) / playerSpeedCheckInterval;
+        playerLastPosition = currentPlayerPos;
+        nextSpeedCheck = Time.time + playerSpeedCheckInterval;
+    }
+
+    void HandleCombatBehavior(float distanceToPlayer) {
+        if (distanceToPlayer < minRange) {
+            RepositionAway();
+            TryShoot();
+            currentState = CombatState.Reposition;
+        }
+        else if (distanceToPlayer > maxRange) {
+            ChasePlayer();
+            currentState = CombatState.Chase;
+        }
+        else if (distanceToPlayer >= minRange && distanceToPlayer <= optimalRange + 1f) {
+            StopAndShoot();
+            currentState = CombatState.Combat;
+        }
+        else {
+            if (distanceToPlayer > optimalRange) {
+                MoveToOptimalRange();
+            }
+            TryShoot();
+            currentState = CombatState.Combat;
+        }
+    }
+
+    void RepositionAway() {
+        if (player == null) return;
+
+        isShooting = false;
+
+        Vector3 awayDirection = (transform.position - player.position).normalized;
+        awayDirection.y = 0;
+
+        if (rb != null) {
+            rb.MovePosition(transform.position + awayDirection * repositionSpeed * Time.deltaTime);
+        }
+        else {
+            transform.position += awayDirection * repositionSpeed * Time.deltaTime;
+        }
+
+        Vector3 lookDirection = (player.position - transform.position).normalized;
+        lookDirection.y = 0;
+        if (lookDirection != Vector3.zero) {
+            transform.forward = lookDirection;
+        }
+
+        UpdateAnimator(false, false, false);
+    }
+
+    void MoveToOptimalRange() {
+        if (player == null) return;
+
+        Vector3 dirToPlayer = (player.position - transform.position).normalized;
+        dirToPlayer.y = 0;
+
+        float moveSpeed = chaseSpeed * 0.5f;
+
+        if (rb != null) {
+            rb.MovePosition(transform.position + dirToPlayer * moveSpeed * Time.deltaTime);
+        }
+        else {
+            transform.position += dirToPlayer * moveSpeed * Time.deltaTime;
+        }
+
+        if (dirToPlayer != Vector3.zero) {
+            transform.forward = dirToPlayer;
+        }
+    }
+
+    void TryShoot() {
+        if (!CanShootPlayer()) return;
+
+        isShooting = true;
+
+        Vector3 dirToPlayer = (player.position - transform.position).normalized;
+        dirToPlayer.y = 0;
+        if (dirToPlayer != Vector3.zero) {
+            transform.forward = dirToPlayer;
+        }
+
+        if (Time.time >= nextFireTime) {
+            ShootAtPlayer();
+            nextFireTime = Time.time + (1f / fireRate);
+        }
 
         if (animator != null) {
-            animator.SetTrigger("PlayerSpotted");
-            animator.SetBool("IsChasing", true);
+            animator.SetBool("IsShooting", true);
+            animator.SetBool("IsChasing", false);
             animator.SetBool("IsPatrolling", false);
         }
+    }
+
+    void OnPlayerSpotted() {
+        Debug.Log("Player spotted!");
+        UpdateAnimator(false, true, false);
     }
 
     void OnPlayerLost() {
         Debug.Log("Player lost!");
         isShooting = false;
-
-        if (animator != null) {
-            animator.SetTrigger("PlayerLost");
-            animator.SetBool("IsChasing", false);
-            animator.SetBool("IsPatrolling", true);
-            animator.SetBool("IsShooting", false);
-        }
+        currentState = CombatState.Patrol;
+        UpdateAnimator(true, false, false);
     }
 
     void PatrolCircle() {
         isShooting = false;
-
-        if (animator != null && !wasPlayerInVision) {
-            animator.SetBool("IsPatrolling", true);
-            animator.SetBool("IsChasing", false);
-            animator.SetBool("IsShooting", false);
-        }
+        UpdateAnimator(true, false, false);
 
         patrolAngle += patrolSpeed * Time.deltaTime;
         float x = Mathf.Cos(patrolAngle) * patrolRadius;
@@ -146,12 +254,7 @@ public class EnemyAI : MonoBehaviour {
 
     void ChasePlayer() {
         isShooting = false;
-
-        if (animator != null) {
-            animator.SetBool("IsChasing", true);
-            animator.SetBool("IsPatrolling", false);
-            animator.SetBool("IsShooting", false);
-        }
+        UpdateAnimator(false, true, false);
 
         Vector3 dir = (player.position - transform.position).normalized;
         dir.y = 0;
@@ -169,24 +272,21 @@ public class EnemyAI : MonoBehaviour {
     }
 
     void StopAndShoot() {
-        isShooting = true;
-
-        if (animator != null) {
-            animator.SetBool("IsChasing", false);
-            animator.SetBool("IsPatrolling", false);
-            animator.SetBool("IsShooting", true);
-        }
-
         Vector3 dirToPlayer = (player.position - transform.position).normalized;
         dirToPlayer.y = 0;
         if (dirToPlayer != Vector3.zero) {
             transform.forward = dirToPlayer;
         }
 
-        if (Time.time >= nextFireTime) {
-            ShootAtPlayer();
-            nextFireTime = Time.time + (1f / fireRate);
-        }
+        TryShoot();
+    }
+
+    void UpdateAnimator(bool patrolling, bool chasing, bool shooting) {
+        if (animator == null) return;
+
+        animator.SetBool("IsPatrolling", patrolling);
+        animator.SetBool("IsChasing", chasing);
+        animator.SetBool("IsShooting", shooting);
     }
 
     void ShootAtPlayer() {
@@ -206,7 +306,15 @@ public class EnemyAI : MonoBehaviour {
 
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
 
-        Vector3 targetPosition = player.position + Vector3.up * 1f;
+        Vector3 targetPosition;
+        if (predictPlayerMovement && playerVelocity.magnitude > 0.1f) {
+            targetPosition = player.position + playerVelocity * predictionTime;
+        }
+        else {
+            targetPosition = player.position;
+        }
+
+        targetPosition += Vector3.up * 1f; 
         Vector3 shootDirection = (targetPosition - firePoint.position).normalized;
 
         Rigidbody bulletRb = bullet.GetComponent<Rigidbody>();
@@ -301,6 +409,12 @@ public class EnemyAI : MonoBehaviour {
         Gizmos.DrawWireSphere(transform.position, shootRange);
 
         Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(transform.position, stopDistance);
+        Gizmos.DrawWireSphere(transform.position, optimalRange);
+
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, minRange);
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, maxRange);
     }
 }
