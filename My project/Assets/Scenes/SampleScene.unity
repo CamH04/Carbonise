@@ -5590,6 +5590,11 @@ MonoBehaviour:
   muzzleFlash: {fileID: 0}
   predictPlayerMovement: 1
   predictionTime: 0.3
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  collisionCheckDistance: 0.5
+  avoidanceForce: 2
 --- !u!136 &474485855
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -6083,10 +6088,13 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: c14fb8205fba9974fbca45460fbad653, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1519714249}
+      addedObject: {fileID: 1519714248}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: c14fb8205fba9974fbca45460fbad653, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1519714248}
+      addedObject: {fileID: 1519714252}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: c14fb8205fba9974fbca45460fbad653, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1519714249}
   m_SourcePrefab: {fileID: 100100000, guid: c14fb8205fba9974fbca45460fbad653, type: 3}
 --- !u!1 &659109392
 GameObject:
@@ -6131,7 +6139,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: d68d361655bd7c64688fd2ebf7a51d64, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.25
+      value: 0.4029
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d68d361655bd7c64688fd2ebf7a51d64, type: 3}
       propertyPath: m_LocalScale.y
@@ -6140,6 +6148,10 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: d68d361655bd7c64688fd2ebf7a51d64, type: 3}
       propertyPath: m_LocalScale.z
       value: 0.25
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: d68d361655bd7c64688fd2ebf7a51d64, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.00049806
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d68d361655bd7c64688fd2ebf7a51d64, type: 3}
       propertyPath: m_LocalPosition.y
@@ -6772,6 +6784,38 @@ MonoBehaviour:
   muzzleFlash: {fileID: 268586971}
   predictPlayerMovement: 1
   predictionTime: 0.3
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 32768
+  collisionCheckDistance: 0.5
+  avoidanceForce: 2
+--- !u!54 &1519714252
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1519714246}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &1550984479
 GameObject:
   m_ObjectHideFlags: 0

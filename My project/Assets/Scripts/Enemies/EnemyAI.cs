@@ -10,13 +10,13 @@ public class EnemyAI : MonoBehaviour {
     public float patrolSpeed = 2f;
     public float chaseSpeed = 4f;
     public float patrolRadius = 3f;
-    public float optimalRange = 6f;          
-    public float minRange = 4f;              
-    public float maxRange = 8f;              
-    public float repositionSpeed = 2f;       
+    public float optimalRange = 6f;
+    public float minRange = 4f;
+    public float maxRange = 8f;
+    public float repositionSpeed = 2f;
 
     [Header("Vision")]
-    public float visionRange = 10f;          
+    public float visionRange = 10f;
     public float visionAngle = 45f;
     public Transform player;
 
@@ -24,21 +24,26 @@ public class EnemyAI : MonoBehaviour {
     public float shootRange = 8f;
     public float shootDamage = 20f;
     public float fireRate = 1f;
-    public float projectileSpeed = 100f;     
+    public float projectileSpeed = 100f;
     public GameObject bulletPrefab;
     public Transform firePoint;
     public LayerMask obstacleMask;
     public AudioClip shootSound;
     public ParticleSystem muzzleFlash;
 
-    [Header("Prediction Settings")]           
+    [Header("Prediction Settings")]
     public bool predictPlayerMovement = true;
     public float predictionTime = 0.3f;
 
+    [Header("Collision Detection")]
+    public LayerMask groundLayer = -1;
+    public float collisionCheckDistance = 0.5f;
+    public float avoidanceForce = 2f;
+
     private float nextFireTime = 0f;
     private bool isShooting = false;
-    private Vector3 playerLastPosition;        
-    private Vector3 playerVelocity;            
+    private Vector3 playerLastPosition;
+    private Vector3 playerVelocity;
     private float playerSpeedCheckInterval = 0.1f;
     private float nextSpeedCheck = 0f;
 
@@ -50,6 +55,7 @@ public class EnemyAI : MonoBehaviour {
     private float patrolAngle;
     private bool wasPlayerInVision = false;
     private float deathAnimLeng = 2f;
+    private CapsuleCollider capsuleCollider;
 
     private enum CombatState {
         Patrol,
@@ -65,9 +71,18 @@ public class EnemyAI : MonoBehaviour {
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
         audioSource = GetComponent<AudioSource>();
+        capsuleCollider = GetComponent<CapsuleCollider>();
 
         if (rb != null) {
             rb.freezeRotation = true;
+            rb.constraints = RigidbodyConstraints.FreezePositionY | RigidbodyConstraints.FreezeRotation; //stopping flaoting bug
+        }
+
+        if (capsuleCollider == null) {
+            capsuleCollider = gameObject.AddComponent<CapsuleCollider>();
+            capsuleCollider.height = 2f;
+            capsuleCollider.radius = 0.5f;
+            capsuleCollider.center = new Vector3(0, 1f, 0);
         }
 
         if (animator == null) {
@@ -77,6 +92,7 @@ public class EnemyAI : MonoBehaviour {
         if (audioSource == null && shootSound != null) {
             audioSource = gameObject.AddComponent<AudioSource>();
         }
+
         if (firePoint == null) {
             GameObject firePointObj = new GameObject("FirePoint");
             firePointObj.transform.SetParent(transform);
@@ -151,6 +167,52 @@ public class EnemyAI : MonoBehaviour {
         }
     }
 
+    Vector3 GetAvoidanceDirection(Vector3 intendedDirection) {
+        Vector3 avoidanceDirection = Vector3.zero;
+        float avoidanceDistance = collisionCheckDistance;
+
+        Vector3[] directions = {
+            intendedDirection,
+            Quaternion.Euler(0, 45f, 0) * intendedDirection,
+            Quaternion.Euler(0, -45f, 0) * intendedDirection,
+            Quaternion.Euler(0, 90f, 0) * intendedDirection,
+            Quaternion.Euler(0, -90f, 0) * intendedDirection
+        };
+
+        Vector3 startPos = transform.position + Vector3.up * 0.1f;
+
+        foreach (Vector3 dir in directions) {
+            if (!Physics.Raycast(startPos, dir, avoidanceDistance, groundLayer)) {
+                return dir.normalized;
+            }
+        }
+
+        if (!Physics.Raycast(startPos, -transform.forward, avoidanceDistance, groundLayer)) {
+            return -transform.forward;
+        }
+
+        return Vector3.zero; 
+    }
+
+    void SafeMove(Vector3 intendedDirection, float speed) {
+        if (intendedDirection == Vector3.zero) return;
+
+        Vector3 safeDirection = GetAvoidanceDirection(intendedDirection);
+        if (safeDirection == Vector3.zero) return;
+
+        Vector3 newPosition = transform.position + safeDirection * speed * Time.deltaTime;
+
+        if (rb != null) {
+            rb.MovePosition(newPosition);
+        }
+        else {
+            transform.position = newPosition;
+        }
+        if (safeDirection != Vector3.zero) {
+            transform.forward = safeDirection;
+        }
+    }
+
     void RepositionAway() {
         if (player == null) return;
 
@@ -159,13 +221,7 @@ public class EnemyAI : MonoBehaviour {
         Vector3 awayDirection = (transform.position - player.position).normalized;
         awayDirection.y = 0;
 
-        if (rb != null) {
-            rb.MovePosition(transform.position + awayDirection * repositionSpeed * Time.deltaTime);
-        }
-        else {
-            transform.position += awayDirection * repositionSpeed * Time.deltaTime;
-        }
-
+        SafeMove(awayDirection, repositionSpeed);
         Vector3 lookDirection = (player.position - transform.position).normalized;
         lookDirection.y = 0;
         if (lookDirection != Vector3.zero) {
@@ -182,17 +238,7 @@ public class EnemyAI : MonoBehaviour {
         dirToPlayer.y = 0;
 
         float moveSpeed = chaseSpeed * 0.5f;
-
-        if (rb != null) {
-            rb.MovePosition(transform.position + dirToPlayer * moveSpeed * Time.deltaTime);
-        }
-        else {
-            transform.position += dirToPlayer * moveSpeed * Time.deltaTime;
-        }
-
-        if (dirToPlayer != Vector3.zero) {
-            transform.forward = dirToPlayer;
-        }
+        SafeMove(dirToPlayer, moveSpeed);
     }
 
     void TryShoot() {
@@ -239,36 +285,21 @@ public class EnemyAI : MonoBehaviour {
         float z = Mathf.Sin(patrolAngle) * patrolRadius;
         Vector3 targetPos = new Vector3(patrolCenter.x + x, transform.position.y, patrolCenter.z + z);
         Vector3 direction = (targetPos - transform.position).normalized;
+        direction.y = 0;
 
-        if (rb != null) {
-            rb.MovePosition(transform.position + direction * patrolSpeed * Time.deltaTime);
-        }
-        else {
-            transform.position = Vector3.MoveTowards(transform.position, targetPos, patrolSpeed * Time.deltaTime);
-        }
-
-        if (direction != Vector3.zero) {
-            transform.forward = direction;
-        }
+        SafeMove(direction, patrolSpeed);
     }
 
     void ChasePlayer() {
+        if (player == null) return;
+
         isShooting = false;
         UpdateAnimator(false, true, false);
 
         Vector3 dir = (player.position - transform.position).normalized;
         dir.y = 0;
 
-        if (rb != null) {
-            rb.MovePosition(transform.position + dir * chaseSpeed * Time.deltaTime);
-        }
-        else {
-            transform.position += dir * chaseSpeed * Time.deltaTime;
-        }
-
-        if (dir != Vector3.zero) {
-            transform.forward = dir;
-        }
+        SafeMove(dir, chaseSpeed);
     }
 
     void StopAndShoot() {
@@ -314,7 +345,7 @@ public class EnemyAI : MonoBehaviour {
             targetPosition = player.position;
         }
 
-        targetPosition += Vector3.up * 1f; 
+        targetPosition += Vector3.up * 1f;
         Vector3 shootDirection = (targetPosition - firePoint.position).normalized;
 
         Rigidbody bulletRb = bullet.GetComponent<Rigidbody>();
@@ -416,5 +447,15 @@ public class EnemyAI : MonoBehaviour {
 
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireSphere(transform.position, maxRange);
+
+        Gizmos.color = Color.white;
+        Vector3 forward = transform.forward * collisionCheckDistance;
+        Vector3 right = Quaternion.Euler(0, 45f, 0) * forward;
+        Vector3 left = Quaternion.Euler(0, -45f, 0) * forward;
+
+        Vector3 startPos = transform.position + Vector3.up * 0.1f;
+        Gizmos.DrawLine(startPos, startPos + forward);
+        Gizmos.DrawLine(startPos, startPos + right);
+        Gizmos.DrawLine(startPos, startPos + left);
     }
 }
