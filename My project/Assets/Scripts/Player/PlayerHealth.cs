@@ -13,7 +13,7 @@ public class PlayerHealth : MonoBehaviour {
     public Color lowHealthColor = Color.red;
 
     [Header("Damage Effects")]
-    public float damageCooldown = 0.35f; 
+    public float damageCooldown = 0f; 
     public AudioClip hurtSound;
     public GameObject damageEffect;
 
